@@ -27,5 +27,4 @@ class EquationNode:
 
 if __name__ == "__main__":
     root = EquationNode('+', '4', '5S')
-    root.
     root.parseTree()

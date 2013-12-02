@@ -1,6 +1,6 @@
 import os
 import sys
-import math
+from math import sin
 import random
 
 operators = ['+', '-', '*', '/', 'sin', '^']
@@ -51,9 +51,20 @@ class EquationNode:
         print(eval(self.eq))
 
 
-#def generate_random_equation():
-#    max_depth = random.randrange(4)
-#    #Everything will be denoted by parentheses.
+def parseTree(current_node):
+    eq = ''
+    if current_node.left is not None:
+        eq += '('
+        eq += parseTree(current_node.left)
+    eq += str(current_node.data)
+    if current_node.left is not None and current_node.right is None:
+        eq += ')'
+    elif current_node.right is not None and current_node.left is None:
+        eq += '('
+    if current_node.right is not None:
+        eq += parseTree(current_node.right)
+        eq += ')'
+    return eq
 
 #This will need to be called recursively
 def assign_node_values(current_node, current_depth, need_x, max_depth):
@@ -185,7 +196,7 @@ if __name__ == "__main__":
 
     root = EquationNode('+')
     assign_node_values(root, 0, True, 4)
-    root.parseTree()
+    print(parseTree(root))
 
 
     read_file(sys.argv[1])

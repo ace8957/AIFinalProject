@@ -8,27 +8,6 @@ file_data = []
 tree_roots = []
 equations = []
 
-#class EquationNode:
-#    eq = ''
-#    def __init__(self, data, left=None, right=None):
-#        if data in operators:
-#            self.left = left
-#            self.right = right
-#        self.data = data
-#
-#    def parseTree(self):
-#        #if isinstance(self.left,EquationNode):
-#        if self.left in operators:
-#            self.parseTree(self.left)
-#        self.eq += self.left
-#        self.eq += self.data
-#        #if isinstance(self.right,EquationNode):
-#        if self.right in operators:
-#            self.parseTree(self.right)
-#        self.eq += self.right
-#        print(self.eq)
-#        print(eval(self.eq))
-
 class EquationNode:
     eq = ''
     left = None
@@ -50,13 +29,26 @@ class EquationNode:
         print(self.eq)
         print(eval(self.eq))
 
+class TreeData:
+    node = None
+    equation = ''
+    error = 0
+
+    def __init__(self, node, equation, error):
+        self.node = node
+        self.equation = equation
+        self.error = error
+
 
 def parseTree(current_node):
     eq = ''
-    if current_node.left is not None:
+    if current_node.left is not None and current_node.data != 'sin':
         eq += '('
         eq += parseTree(current_node.left)
     eq += str(current_node.data)
+    if current_node.data == 'sin' and current_node.left is not None:
+        eq += '('
+        eq += parseTree(current_node.left)
     if current_node.left is not None and current_node.right is None:
         eq += ')'
     elif current_node.right is not None and current_node.left is None:
@@ -64,7 +56,7 @@ def parseTree(current_node):
     if current_node.right is not None:
         eq += parseTree(current_node.right)
         eq += ')'
-    return eq
+    return eq.replace('^', '**')
 
 #This will need to be called recursively
 def assign_node_values(current_node, current_depth, need_x, max_depth):
@@ -72,7 +64,7 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
             right = 0
             double_operators = ['+', '-', '*', '/', '^']
             single_operators = ['sin']
-            possible_values = ['+', '-', '*', '/', 'sin', '^', 'num', 'x','num','num']
+            possible_values = ['+', '-', '*', '/', 'sin', '^', 'num', 'x', 'num', 'num']
 
             #check to see if we have been called on a node that is not an operator
             if current_node.data not in operators:
@@ -101,7 +93,7 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
             if left is not None:
                 left = random.choice(possible_values)
                 if left == 'num':
-                    left = random.randrange(0,100)
+                    left = random.randrange(0, 100)
                 elif left == 'x':
                     need_x = False
                 print("Assigning " + str(left) + " to left node at depth " + str(current_depth))
@@ -116,51 +108,6 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
                 print("Assigning " + str(right) + " to right node at depth " + str(current_depth))
                 current_node.right = EquationNode(right)
                 assign_node_values(current_node.right,current_depth+1,need_x,max_depth)
-
-
-#def construct_random_trees():
-#    double_operators = ['+', '-', '*', '/', '^']
-#    single_operators = ['sin']
-#    #we will create twenty starting trees to use for genetic evolution
-#    for i in range(0,20):
-#        #find the max depth of the tree that we will use. Does this need to always be 4(max)?
-#        max_depth = random.randrange(0,4)
-#        need_x = True
-#        root = None
-#        last_root = None
-#        remaining_nodes = []
-#        for j in range(0,max_depth+1):
-#            #the values which will go into the left and right nodes
-#            left = 0
-#            right = 0
-#            #decide what the first operator should be
-#            op = random.choice(operators)
-#            #if the operator is in the single_operators list, we will not have a left or right node
-#            if op in single_operators:
-#                #will the single leg be on the left or right?
-#                leg = random.choice(['left', 'right'])
-#                if leg == 'left':
-#                    right = None
-#                elif leg == 'right':
-#                    left = None
-#            #check to see if we are at our maximum depth
-#            if j == max_depth:
-#                if need_x is True:
-#                    if left == 0:
-#                        left = 'x'
-#                        need_x = False
-#                    elif right == 0:
-#                        right = 'x'
-#                        need_x = False
-#                else:
-#                    #we do not still need to place an x, and we are at max depth, so pick a random number
-#                    if left == 0:
-#                        left = random.randrange(0,100)
-#                    if right == 0:
-#                        right = random.randrange(0,100)
-#            else:
-#                #check to see if we are the root node, if we are, set root to the current node
-#                # and last_node to the current node
 
 
 def read_file(filename):
@@ -179,25 +126,45 @@ def calc_rms_error(equation, data_array):
         l = entry.split(',')
         x = int(l[0])
         y = int(l[1])
-        ans = eval(equation.replace('x', str(x)))
-        squares.append((y-ans)**2)
+        try:
+            ans = eval(equation.replace('x', str(x)))
+        except ZeroDivisionError:
+            return 9999999999
+        except OverflowError:
+            return 9999999999
+        try:
+            squares.append((y-ans)**2)
+        except OverflowError:
+            return 9999999999
     ssum = 0
     for square in squares:
         ssum += square
-    ssum = ssum / len(squares)
+    try:
+        ssum = ssum / len(squares)
+    except OverflowError:
+            return 9999999999
     return ssum ** 0.5
 
+
+def create_random_trees():
+    for x in range(0,20):
+        node = EquationNode(random.choice(operators))
+        assign_node_values(node, 0, True, 4)
+        eq = parseTree(node)
+        tree_roots.append(TreeData(node, eq, calc_rms_error(eq, file_data)))
+        print()
+
+
+def print_equations(tree):
+    for node in tree:
+        print(node.error)
+
 if __name__ == "__main__":
-    #root = EquationNode('+')
-    #left = EquationNode(4)
-    #right = EquationNode(5)
-    #root.left = left
-    #root.right = right
-
-    root = EquationNode('+')
-    assign_node_values(root, 0, True, 4)
-    print(parseTree(root))
-
 
     read_file(sys.argv[1])
-    calc_rms_error('x+2', ['2,3','4,5'])
+    create_random_trees()
+    print_equations(tree_roots)
+    print()
+    sorted_tree = sorted(tree_roots, key=lambda node: node.error)
+    print_equations(sorted_tree)
+

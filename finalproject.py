@@ -3,10 +3,19 @@ import sys
 from math import sin
 import random
 
+#Constants
+NUM_TREES = 100
+TOP_PERCENT = .8
+BOTTOM_PERCENT = .2
+INVALID_RETURN = 9999999999
+WINNING_ERROR_BOUND = 100
+MAX_GENERATIONS = 10
+
 operators = ['+', '-', '*', '/', 'sin', '^']
 file_data = []
 tree_roots = []
 equations = []
+
 
 class EquationNode:
     eq = ''
@@ -15,19 +24,6 @@ class EquationNode:
     data = None
     def __init__(self, data=None):
         self.data = data
-
-    def parseTree(self):
-        #if isinstance(self.left,EquationNode):
-        if self.left in operators:
-            self.parseTree(self.left)
-        self.eq += str(self.left.data)
-        self.eq += str(self.data)
-        #if isinstance(self.right,EquationNode):
-        if self.right in operators:
-            self.parseTree(self.right)
-        self.eq += str(self.right.data)
-        print(self.eq)
-        print(eval(self.eq))
 
 class TreeData:
     node = None
@@ -96,7 +92,7 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
                     left = random.randrange(0, 100)
                 elif left == 'x':
                     need_x = False
-                print("Assigning " + str(left) + " to left node at depth " + str(current_depth))
+                #print("Assigning " + str(left) + " to left node at depth " + str(current_depth))
                 current_node.left = EquationNode(left)
                 assign_node_values(current_node.left,current_depth+1,need_x,max_depth)
             if right is not None:
@@ -105,10 +101,19 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
                     right = random.randrange(0,100)
                 elif left == 'x':
                     need_x = False
-                print("Assigning " + str(right) + " to right node at depth " + str(current_depth))
+                #print("Assigning " + str(right) + " to right node at depth " + str(current_depth))
                 current_node.right = EquationNode(right)
                 assign_node_values(current_node.right,current_depth+1,need_x,max_depth)
 
+#we need to perform a check for nested exponentials because they either take forever to evaluate or they
+#cause some seriously long computation times. For now, get right of any case where there are three ** occurrences
+#in the equation
+def nested_exponential_check(eq):
+    count = eq.count('**')
+    if count >= 3:
+        return True
+    else:
+        return False
 
 def read_file(filename):
     f = open(filename, 'r')
@@ -126,31 +131,45 @@ def calc_rms_error(equation, data_array):
         l = entry.split(',')
         x = int(l[0])
         y = int(l[1])
+        #need to keep from having imaginary elements in there... that causes an error
+        #so immediately return the value of the thing has sin(sin(x)) in it
+        if 'sin(sin' in equation:
+            return INVALID_RETURN
+        #another check for an edge case: nested exponents
+        if nested_exponential_check(equation) is True:
+            return INVALID_RETURN
         try:
             ans = eval(equation.replace('x', str(x)))
         except ZeroDivisionError:
-            return 9999999999
+            return INVALID_RETURN
         except OverflowError:
-            return 9999999999
+            return INVALID_RETURN
+        #we need this check to get rid of things with an imaginary component
+        except TypeError:
+            return INVALID_RETURN
+        #we need to keep this from having a complex component as well, because we can't sort by it
+        if isinstance(ans, complex):
+            return INVALID_RETURN
         try:
             squares.append((y-ans)**2)
         except OverflowError:
-            return 9999999999
+            return INVALID_RETURN
     ssum = 0
     for square in squares:
         ssum += square
     try:
         ssum = ssum / len(squares)
     except OverflowError:
-            return 9999999999
+            return INVALID_RETURN
     return ssum ** 0.5
 
 
 def create_random_trees():
-    for x in range(0,20):
+    for x in range(0, NUM_TREES):
         node = EquationNode(random.choice(operators))
         assign_node_values(node, 0, True, 4)
         eq = parseTree(node)
+        print(eq)
         tree_roots.append(TreeData(node, eq, calc_rms_error(eq, file_data)))
         print()
 
@@ -159,12 +178,29 @@ def print_equations(tree):
     for node in tree:
         print(node.error)
 
-if __name__ == "__main__":
 
+#this function will go through and to see if we are within WINNING_ERROR_BOUND of the correct answer
+def check_for_winner():
+    for tree in tree_roots:
+        if tree.error <= WINNING_ERROR_BOUND:
+            print('We have a winner! The winning equation is: ' + str(tree.equation))
+
+
+def produce_next_generation():
+
+
+
+if __name__ == "__main__":
     read_file(sys.argv[1])
     create_random_trees()
     print_equations(tree_roots)
     print()
     sorted_tree = sorted(tree_roots, key=lambda node: node.error)
     print_equations(sorted_tree)
+
+    check_for_winner()
+
+    produce_next_generation()
+    print_equations(tree_roots)
+
 

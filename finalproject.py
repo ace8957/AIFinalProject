@@ -2,6 +2,7 @@ import os
 import sys
 from math import sin
 import random
+import copy
 
 #Constants
 NUM_TREES = 100
@@ -198,6 +199,27 @@ def count_operator_nodes(tree, count):
     return count
 
 
+#This will return a copy of the root node that points to a full copy of the provided tree
+def copy_tree(root):
+    new_root = EquationNode(root.data)
+    if root.left is not None:
+        new_root.left = copy_tree(root.left)
+    if root.right is not None:
+        new_root.right = copy_tree(root.right)
+    return new_root
+
+
+#get a node that appears at a certain level. The location will be based off of the count_operator_nodes() return value
+#this function will return the root of the subtree
+def get_node_at_operator_location(root, node_location):
+    print()
+
+
+#this function will replace the node at a certain subtree level with the provided subtree_root
+#The location value will be based off of the count_operator_nodes() return value
+def replace_node_at_operator_location(root, location, subtree_root):
+    print()
+
 
 def produce_next_generation():
     #we want to take 80% of our stuff from the top 20%
@@ -208,7 +230,9 @@ def produce_next_generation():
     sorted_trees = sorted(tree_roots, key=lambda node: node.error)
 
     #store the newly-created trees in here temporarily -- they will replace tree_roots when this function returns
-    decendents = []
+    descendants = []
+
+    #perform a certain percentage of the combinations only from the top percentage of the parents
     for x in range(0, top_percentage_count):
         #get random trees to combine from the sorted_trees list
         tree1 = sorted_trees[random.randrange(0,top_percentage_count)]
@@ -223,6 +247,25 @@ def produce_next_generation():
         node_1 = random.randrange(2, op_count_1+1)
         node_2 = random.randrange(2, op_count_2+1)
 
+        #randomly decide whether to pick from tree1 or tree2
+        donator_choice = random.randrange(0,2)
+        if donator_choice == 0:
+            #pick from tree 1 and place onto tree 2, store in descendants
+            donated_node = get_node_at_operator_location(tree1, node_1)
+            #we are going to want to copy this tree before we stick stuff into it, in case we want to save the parent
+            new_root = copy_tree(tree2)
+            replace_node_at_operator_location(new_root, node_2, donated_node)
+        elif donator_choice == 1:
+            #pick from tree 2 and place onto tree 1, store in descendants
+            donated_node = get_node_at_operator_location(tree2, node_2)
+            #we are going to want to copy this tree before we stick stuff into it, in case we want to save the parent
+            new_root = copy_tree(tree2)
+            replace_node_at_operator_location(new_root, node_1, donated_node)
+        #we have finished one iteration of the combination, add to descendents list now
+        eq = parseTree(new_root)
+        descendants.append(TreeData(new_root, eq, calc_rms_error(eq, file_data)))
+
+
 
 if __name__ == "__main__":
     read_file(sys.argv[1])
@@ -230,7 +273,6 @@ if __name__ == "__main__":
     print_equations(tree_roots)
     print()
     sorted_tree = sorted(tree_roots, key=lambda node: node.error)
-    #print_equations(sorted_tree)
 
     check_for_winner()
 
@@ -238,7 +280,12 @@ if __name__ == "__main__":
     print(tree_roots[0].equation)
     print(count_operator_nodes(tree_roots[0].node, 0))
 
-    #produce_next_generation()
-    #print_equations(tree_roots)
+    #root = EquationNode('+')
+    #root.left = EquationNode('4')
+    #root.right = EquationNode('5')
+    #new_root = copy_tree(root)
+    #print(parseTree(new_root))
+    #root.data = '-'
+    #print(parseTree(new_root))
 
 

@@ -5,10 +5,12 @@ import random
 
 #Constants
 NUM_TREES = 100
-TOP_PERCENT = .8
-BOTTOM_PERCENT = .2
+TOP_PERCENT = 0.2
+BOTTOM_PERCENT = 0.8
+TOP_PERCENT_PROPORTION = .8
+BOTTOM_PERCENT_PROPORTION = .2
 INVALID_RETURN = 9999999999
-WINNING_ERROR_BOUND = 100
+WINNING_ERROR_BOUND = 500
 MAX_GENERATIONS = 10
 
 operators = ['+', '-', '*', '/', 'sin', '^']
@@ -155,9 +157,9 @@ def calc_rms_error(equation, data_array):
         except OverflowError:
             return INVALID_RETURN
     ssum = 0
-    for square in squares:
-        ssum += square
     try:
+        for square in squares:
+            ssum += square
         ssum = ssum / len(squares)
     except OverflowError:
             return INVALID_RETURN
@@ -186,8 +188,40 @@ def check_for_winner():
             print('We have a winner! The winning equation is: ' + str(tree.equation))
 
 
-def produce_next_generation():
+def count_operator_nodes(tree, count):
+    if tree.data in operators:
+        count = count + 1
+    if tree.left is not None:
+        count = count_operator_nodes(tree.left, count)
+    if tree.right is not None:
+        count = count_operator_nodes(tree.right, count)
+    return count
 
+
+
+def produce_next_generation():
+    #we want to take 80% of our stuff from the top 20%
+    top_percentage_count = int(TOP_PERCENT * len(tree_roots))
+    bottom_percentage_count = int(BOTTOM_PERCENT * len(tree_roots))
+
+    #sort the tree
+    sorted_trees = sorted(tree_roots, key=lambda node: node.error)
+
+    #store the newly-created trees in here temporarily -- they will replace tree_roots when this function returns
+    decendents = []
+    for x in range(0, top_percentage_count):
+        #get random trees to combine from the sorted_trees list
+        tree1 = sorted_trees[random.randrange(0,top_percentage_count)]
+        tree2 = sorted_trees[random.randrange(0,top_percentage_count)]
+
+        #now randomly recombine nodes from tree1 onto tree2
+        #traverse the trees to figure out how many non-number or x nodes they have
+        op_count_1 = count_operator_nodes(tree1, 0)
+        op_count_2 = count_operator_nodes(tree2, 0)
+
+        #we want to randomly pick a subtree to replace and a subtree to replace it
+        node_1 = random.randrange(2, op_count_1+1)
+        node_2 = random.randrange(2, op_count_2+1)
 
 
 if __name__ == "__main__":
@@ -196,11 +230,15 @@ if __name__ == "__main__":
     print_equations(tree_roots)
     print()
     sorted_tree = sorted(tree_roots, key=lambda node: node.error)
-    print_equations(sorted_tree)
+    #print_equations(sorted_tree)
 
     check_for_winner()
 
-    produce_next_generation()
-    print_equations(tree_roots)
+    print()
+    print(tree_roots[0].equation)
+    print(count_operator_nodes(tree_roots[0].node, 0))
+
+    #produce_next_generation()
+    #print_equations(tree_roots)
 
 

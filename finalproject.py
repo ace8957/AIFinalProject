@@ -5,7 +5,7 @@ import random
 import copy
 
 #Constants
-NUM_TREES = 20
+NUM_TREES = 100
 TOP_PERCENT = 0.2
 BOTTOM_PERCENT = 0.8
 TOP_PERCENT_PROPORTION = .8
@@ -231,12 +231,16 @@ def get_node_at_operator_location(root, node_location):
 def replace_node_at_operator_location(root, location, current_location, subtree_root):
     if root.data in operators:
         current_location = current_location + 1
-    if current_location == location:
+    if current_location + 1 == location and root.left is not None:
         print("Replacing")
         print(parseTree(root))
-        fake_root = root
-        fake_root = subtree_root
-        print(parseTree(fake_root))
+        root.left = subtree_root
+        print(parseTree(root.left))
+    elif current_location + 1 == location and root.right is not None:
+        print("Replacing")
+        print(parseTree(root))
+        root.right = subtree_root
+        print(parseTree(root.right))
     elif root.left is not None:
         current_location = replace_node_at_operator_location(root.left, location, current_location, subtree_root)
     elif root.right is not None:
@@ -315,7 +319,7 @@ if __name__ == "__main__":
     read_file(sys.argv[1])
     create_random_trees()
 
-    for i in range(0, 1):
+    for i in range(0, 10):
         if check_for_winner() is True:
             break
         else:

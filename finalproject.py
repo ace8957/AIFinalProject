@@ -14,7 +14,7 @@ TOP_PERCENT_PROPORTION = .8
 BOTTOM_PERCENT_PROPORTION = .2
 INVALID_RETURN = 9999999999
 WINNING_ERROR_BOUND = 500
-MAX_GENERATIONS = 10
+MAX_GENERATIONS = 20
 
 NUM_PERMITTED_NESTED_EXPONENTS = 2
 
@@ -26,6 +26,7 @@ equations = []
 
 class EquationNode:
     eq = ''
+    depth = 0
     left = None
     right = None
     data = None
@@ -49,6 +50,7 @@ def parseTree(current_node):
         eq += '('
         eq += parseTree(current_node.left)
     eq += str(current_node.data)
+    print(current_node.depth)
     if current_node.data == '100*sin' and current_node.left is not None:
         eq += '('
         eq += parseTree(current_node.left)
@@ -71,6 +73,7 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
 
             #check to see if we have been called on a node that is not an operator
             if current_node.data not in operators:
+                current_node.depth = current_depth
                 return
             #check to see if we are already at max depth
             #if we are max depth and still need x, then override the current_node.data with x
@@ -78,6 +81,7 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
             if current_depth == max_depth:
                 if need_x is True:
                     current_node.data = 'x'
+                    current_node.depth = current_depth
                     return
                 else:
                     return
@@ -100,6 +104,7 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
                 elif left == 'x':
                     need_x = False
                 current_node.left = EquationNode(left)
+                current_node.depth = current_depth+1
                 assign_node_values(current_node.left,current_depth+1,need_x,max_depth)
             if right is not None:
                 right = random.choice(possible_values)
@@ -108,6 +113,7 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
                 elif left == 'x':
                     need_x = False
                 current_node.right = EquationNode(right)
+                current_node.depth = current_depth+1
                 assign_node_values(current_node.right,current_depth+1,need_x,max_depth)
 
 #we need to perform a check for nested exponentials because they either take forever to evaluate or they
@@ -138,6 +144,7 @@ def calculate_exponential_base(equation):
     for x in range(0, num_needed_close_paren):
         base_equation += ')'
 
+    print(base_equation)
     return base_equation
 
 def calculate_exponential_power(equation):
@@ -214,6 +221,7 @@ def calc_rms_error(equation, data_array):
 def create_random_trees():
     for x in range(0, NUM_TREES):
         node = EquationNode(random.choice(operators))
+        node.depth = 0
         assign_node_values(node, 0, True, MAX_DEPTH)
         eq = parseTree(node)
         #print(eq)
@@ -247,6 +255,7 @@ def count_operator_nodes(tree, count):
 #This will return a copy of the root node that points to a full copy of the provided tree
 def copy_tree(root):
     new_root = EquationNode(root.data)
+    new_root.depth = root.depth
     if root.left is not None:
         new_root.left = copy_tree(root.left)
     if root.right is not None:
@@ -313,6 +322,13 @@ def get_depth_of_tree(tree, current_max):
         return current_max
 
 
+def set_depth_values(tree, current_max):
+    tree.depth = current_max
+    if tree.left is not None:
+        set_depth_values(tree.left, current_max+1)
+    if tree.right is not None:
+        set_depth_values(tree.right, current_max+1)
+
 def produce_next_generation():
     #we want to take 80% of our stuff from the top 20%
     top_percentage_count = int(TOP_PERCENT * len(tree_roots))
@@ -325,7 +341,8 @@ def produce_next_generation():
     descendants = []
 
     #perform a certain percentage of the combinations only from the top percentage of the parents
-    for x in range(0, top_percentage_count):
+    x = 0
+    while x < top_percentage_count:
         tree1_index = 0
         tree2_index = 0
         #get non-identical indexes
@@ -343,6 +360,7 @@ def produce_next_generation():
 
         #we want to randomly pick a subtree to replace and a subtree to replace it
         if op_count_1+1 <= 2 or op_count_2+1 <= 2:
+            x += 1
             continue
         node_1 = random.randrange(2, op_count_1+1)
         node_2 = random.randrange(2, op_count_2+1)
@@ -350,6 +368,9 @@ def produce_next_generation():
         #pick from tree 1 and place onto tree 2, store in descendants
         donated_node = get_node_at_operator_location(tree1.node, node_1)
         new_donated_node = copy_tree(donated_node)
+        if get_node_at_operator_location(tree2.node, node_2).depth + get_depth_of_tree(new_donated_node, 0) > MAX_DEPTH:
+            x -= 1
+            continue
         print("Adding subtree " + parseTree(donated_node) + " at location " + str(node_2))
         #we are going to want to copy this tree before we stick stuff into it, in case we want to save the parent
         new_root = copy_tree(tree2.node)
@@ -359,10 +380,12 @@ def produce_next_generation():
 
         #we have finished one iteration of the combination, add to descendents list now
         eq = parseTree(new_root)
+        set_depth_values(new_root, 0)
         err = calc_rms_error(eq, file_data)
         print("Err value: " + str(err))
         print()
         descendants.append(TreeData(new_root, eq, err))
+        x += 1
 
     #for x in range(0, bottom_percentage_count):
     #        tree1_index = 0
@@ -404,7 +427,7 @@ def produce_next_generation():
     #        descendants.append(TreeData(new_root, eq, err))
 
     tree_roots.extend(descendants)
-    eliminate_bottom_population(int(len(descendants)/2))
+    eliminate_bottom_population(int(len(tree_roots)/5))
 
 
 def is_number(s):

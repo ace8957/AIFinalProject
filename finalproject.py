@@ -7,7 +7,7 @@ import copy
 #Constants
 NUM_TREES = 200
 MAX_DEPTH = 4
-NUM_MUTATIONS_PER_GEN = 10
+NUM_MUTATIONS_PER_GEN = 40
 TOP_PERCENT = 0.2
 BOTTOM_PERCENT = 0.8
 TOP_PERCENT_PROPORTION = .8
@@ -119,6 +119,48 @@ def nested_exponential_check(eq):
         return True
     else:
         return False
+
+def calculate_exponential_base(equation):
+    #we need to find what the base of an exponent is to decide if it is of too large a value
+    #I think the best way to do this given the way everything else works is to parse the equation string
+    #The base should be the part to the left of the exponential, with one ( to match every )
+
+    #check if we have been called on an equation with no exponent
+    if equation.count('**') == 0:
+        return equation
+    #get the base equation. Will probably have extra ( on the front
+    base_equation = equation.split("**", 1)[0]
+
+    #add as many closing parenthesis as there are opening ones
+    open_paren_count = base_equation.count('(')
+    close_paren_count = base_equation.count(')')
+    num_needed_close_paren = open_paren_count - close_paren_count
+    for x in range(0, num_needed_close_paren):
+        base_equation += ')'
+
+    return base_equation
+
+def calculate_exponential_power(equation):
+    #we need to find what the base of an exponent is to decide if it is of too large a value
+    #I think the best way to do this given the way everything else works is to parse the equation string
+    #The base should be the part to the left of the exponential, with one ( to match every )
+
+    #check if we have been called on an equation with no exponent
+    if equation.count('**') == 0:
+        return equation
+    #get the base equation. Will probably have extra ( on the front
+    base_equation = equation.split("**", 1)[1]
+
+    #add as many closing parenthesis as there are opening ones
+    open_paren_count = base_equation.count('(')
+    close_paren_count = base_equation.count(')')
+    num_needed_open_paren = close_paren_count - open_paren_count
+    base_equation = base_equation[::-1]
+    for x in range(0, num_needed_open_paren):
+        base_equation += '('
+
+    return base_equation[::-1]
+
 
 def read_file(filename):
     f = open(filename, 'r')
@@ -250,6 +292,27 @@ def replace_node_at_operator_location(root, location, current_location, subtree_
     return current_location
 
 
+#we need to traverse the tree and determine how deep it is
+def get_depth_of_tree(tree, current_max):
+    left_current_max = 0
+    right_current_max = 0
+    if tree.data in operators:
+        if tree.left is not None or tree.right is not None:
+            current_max = current_max + 1
+        if tree.left is not None:
+            left_current_max = get_depth_of_tree(tree.left, current_max)
+        if tree.right is not None:
+            right_current_max = get_depth_of_tree(tree.right, current_max)
+        if left_current_max >= right_current_max and left_current_max >= current_max:
+            return left_current_max
+        elif right_current_max > left_current_max and right_current_max > current_max:
+            return right_current_max
+        else:
+            return current_max
+    else:
+        return current_max
+
+
 def produce_next_generation():
     #we want to take 80% of our stuff from the top 20%
     top_percentage_count = int(TOP_PERCENT * len(tree_roots))
@@ -293,51 +356,55 @@ def produce_next_generation():
         print("Equation before: " + str(parseTree(new_root)))
         replace_node_at_operator_location(new_root, node_2, 0, new_donated_node)
         print("Equation after: " + str(parseTree(new_root)))
-        print()
 
         #we have finished one iteration of the combination, add to descendents list now
         eq = parseTree(new_root)
-        descendants.append(TreeData(new_root, eq, calc_rms_error(eq, file_data)))
+        err = calc_rms_error(eq, file_data)
+        print("Err value: " + str(err))
+        print()
+        descendants.append(TreeData(new_root, eq, err))
 
-    for x in range(0, bottom_percentage_count):
-            tree1_index = 0
-            tree2_index = 0
-            #get non-identical indexes
-            while tree1_index == tree2_index:
-                tree1_index = random.randrange(0, top_percentage_count)
-                tree2_index = random.randrange(0, top_percentage_count)
-            #get random trees to combine from the sorted_trees list
-            tree1 = sorted_trees[tree1_index]
-            tree2 = sorted_trees[tree2_index]
-
-            #now randomly recombine nodes from tree1 onto tree2
-            #traverse the trees to figure out how many non-number or x nodes they have
-            op_count_1 = count_operator_nodes(tree1.node, 0)
-            op_count_2 = count_operator_nodes(tree2.node, 0)
-
-            #we want to randomly pick a subtree to replace and a subtree to replace it
-            if op_count_1+1 <= 2 or op_count_2+1 <= 2:
-                continue
-            node_1 = random.randrange(2, op_count_1+1)
-            node_2 = random.randrange(2, op_count_2+1)
-
-            #pick from tree 1 and place onto tree 2, store in descendants
-            donated_node = get_node_at_operator_location(tree1.node, node_1)
-            new_donated_node = copy_tree(donated_node)
-            print("Adding subtree " + parseTree(donated_node) + " at location " + str(node_2))
-            #we are going to want to copy this tree before we stick stuff into it, in case we want to save the parent
-            new_root = copy_tree(tree2.node)
-            print("Equation before: " + str(parseTree(new_root)))
-            replace_node_at_operator_location(new_root, node_2, 0, new_donated_node)
-            print("Equation after: " + str(parseTree(new_root)))
-            print()
-
-            #we have finished one iteration of the combination, add to descendents list now
-            eq = parseTree(new_root)
-            descendants.append(TreeData(new_root, eq, calc_rms_error(eq, file_data)))
+    #for x in range(0, bottom_percentage_count):
+    #        tree1_index = 0
+    #        tree2_index = 0
+    #        #get non-identical indexes
+    #        while tree1_index == tree2_index:
+    #            tree1_index = random.randrange(0, top_percentage_count)
+    #            tree2_index = random.randrange(0, top_percentage_count)
+    #        #get random trees to combine from the sorted_trees list
+    #        tree1 = sorted_trees[tree1_index]
+    #        tree2 = sorted_trees[tree2_index]
+    #
+    #        #now randomly recombine nodes from tree1 onto tree2
+    #        #traverse the trees to figure out how many non-number or x nodes they have
+    #        op_count_1 = count_operator_nodes(tree1.node, 0)
+    #        op_count_2 = count_operator_nodes(tree2.node, 0)
+    #
+    #        #we want to randomly pick a subtree to replace and a subtree to replace it
+    #        if op_count_1+1 <= 2 or op_count_2+1 <= 2:
+    #            continue
+    #        node_1 = random.randrange(2, op_count_1+1)
+    #        node_2 = random.randrange(2, op_count_2+1)
+    #
+    #        #pick from tree 1 and place onto tree 2, store in descendants
+    #        donated_node = get_node_at_operator_location(tree1.node, node_1)
+    #        new_donated_node = copy_tree(donated_node)
+    #        print("Adding subtree " + parseTree(donated_node) + " at location " + str(node_2))
+    #        #we are going to want to copy this tree before we stick stuff into it, in case we want to save the parent
+    #        new_root = copy_tree(tree2.node)
+    #        print("Equation before: " + str(parseTree(new_root)))
+    #        replace_node_at_operator_location(new_root, node_2, 0, new_donated_node)
+    #        print("Equation after: " + str(parseTree(new_root)))
+    #
+    #        #we have finished one iteration of the combination, add to descendents list now
+    #        eq = parseTree(new_root)
+    #        err = calc_rms_error(eq, file_data)
+    #        print("Err value: " + str(err))
+    #        print()
+    #        descendants.append(TreeData(new_root, eq, err))
 
     tree_roots.extend(descendants)
-    eliminate_bottom_population(len(descendants))
+    eliminate_bottom_population(int(len(descendants)/2))
 
 
 def is_number(s):
@@ -404,13 +471,16 @@ if __name__ == "__main__":
             perform_mutations()
             #print_equations(tree_roots)
 
+    # print(calculate_exponential_power('((x**3)-((x+10)**2))'))
+
     #print_equations(produce_next_generation())
 
-    #print()
-    #print(tree_roots[0].equation)
-    #print(count_operator_nodes(tree_roots[0].node, 0))
-    #result = get_node_at_operator_location(tree_roots[0].node, 3)
-    #print(parseTree(result))
+    # print()
+    # print(tree_roots[0].equation)
+    # print(get_depth_of_tree(tree_roots[0].node, 0))
+    #
+    # result = get_node_at_operator_location(tree_roots[0].node, 3)
+    # print(parseTree(result))
 
     #copy tree test
     #print()

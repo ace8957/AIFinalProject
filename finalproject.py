@@ -5,7 +5,7 @@ import random
 import copy
 
 #Constants
-NUM_TREES = 100
+NUM_TREES = 200
 MAX_DEPTH = 4
 NUM_MUTATIONS_PER_GEN = 10
 TOP_PERCENT = 0.2
@@ -18,7 +18,7 @@ MAX_GENERATIONS = 10
 
 NUM_PERMITTED_NESTED_EXPONENTS = 2
 
-operators = ['+', '-', '*', '/', 'sin', '^']
+operators = ['+', '-', '*', '/', '100*sin', '^']
 file_data = []
 tree_roots = []
 equations = []
@@ -45,11 +45,11 @@ class TreeData:
 
 def parseTree(current_node):
     eq = ''
-    if current_node.left is not None and current_node.data != 'sin':
+    if current_node.left is not None and current_node.data != '100*sin':
         eq += '('
         eq += parseTree(current_node.left)
     eq += str(current_node.data)
-    if current_node.data == 'sin' and current_node.left is not None:
+    if current_node.data == '100*sin' and current_node.left is not None:
         eq += '('
         eq += parseTree(current_node.left)
     if current_node.left is not None and current_node.right is None:
@@ -66,8 +66,8 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
             left = 0
             right = 0
             double_operators = ['+', '-', '*', '/', '^']
-            single_operators = ['sin']
-            possible_values = ['+', '-', '*', '/', 'sin', '^', 'num', 'x', 'num', 'num']
+            single_operators = ['100*sin']
+            possible_values = ['+', '-', '*', '/', '100*sin', '^', 'num', 'x', 'num', 'num']
 
             #check to see if we have been called on a node that is not an operator
             if current_node.data not in operators:
@@ -138,7 +138,7 @@ def calc_rms_error(equation, data_array):
         y = int(l[1])
         #need to keep from having imaginary elements in there... that causes an error
         #so immediately return the value of the thing has sin(sin(x)) in it
-        if 'sin(sin' in equation:
+        if '100*sin(100*sin' in equation:
             return INVALID_RETURN
         #another check for an edge case: nested exponents
         if nested_exponential_check(equation) is True:
@@ -362,21 +362,24 @@ def perform_mutations():
 
 def set_operator_at_depth(tree_node, new_op, target_depth, count):
     double_operators = ['+', '-', '*', '/', '^']
-    single_operators = ['sin']
+    single_operators = ['100*sin']
     if tree_node.data in operators:
         count = count + 1
     if count == target_depth:
+        #HACK HACK HACK HACK
+        while new_op in single_operators:
+            new_op = random.choice(operators)
         old_op = tree_node.data
         tree_node.data = new_op
         if old_op in single_operators and new_op in double_operators:
             if tree_node.right is None and tree_node.left is not None:
-                tree_node.right = random.randrange(0, 100)
+                tree_node.right = EquationNode(str(random.randrange(0, 100)))
             elif tree_node.left is None and tree_node.right is not None:
-                tree_node.left = random.randrange(0, 100)
+                tree_node.left = EquationNode(str(random.randrange(0, 100)))
     elif tree_node.left is not None:
-        count = count_operator_nodes(tree_node.left, count)
+        count = set_operator_at_depth(tree_node, new_op, target_depth, count)
     elif tree_node.right is not None:
-        count = count_operator_nodes(tree_node.right, count)
+        count = set_operator_at_depth(tree_node, new_op, target_depth, count)
     return count
 
 

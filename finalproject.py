@@ -6,6 +6,7 @@ import copy
 
 #Constants
 NUM_TREES = 100
+MAX_DEPTH = 4
 TOP_PERCENT = 0.2
 BOTTOM_PERCENT = 0.8
 TOP_PERCENT_PROPORTION = .8
@@ -170,7 +171,7 @@ def calc_rms_error(equation, data_array):
 def create_random_trees():
     for x in range(0, NUM_TREES):
         node = EquationNode(random.choice(operators))
-        assign_node_values(node, 0, True, 4)
+        assign_node_values(node, 0, True, MAX_DEPTH)
         eq = parseTree(node)
         #print(eq)
         tree_roots.append(TreeData(node, eq, calc_rms_error(eq, file_data)))
@@ -310,8 +311,65 @@ def produce_next_generation():
         eq = parseTree(new_root)
         descendants.append(TreeData(new_root, eq, calc_rms_error(eq, file_data)))
 
-    tree_roots.extend(descendants)
+    for x in range(0, bottom_percentage_count):
+            tree1_index = 0
+            tree2_index = 0
+            #get non-identical indexes
+            while tree1_index == tree2_index:
+                tree1_index = random.randrange(0, top_percentage_count)
+                tree2_index = random.randrange(0, top_percentage_count)
+            #get random trees to combine from the sorted_trees list
+            tree1 = sorted_trees[tree1_index]
+            tree2 = sorted_trees[tree2_index]
 
+            #now randomly recombine nodes from tree1 onto tree2
+            #traverse the trees to figure out how many non-number or x nodes they have
+            op_count_1 = count_operator_nodes(tree1.node, 0)
+            op_count_2 = count_operator_nodes(tree2.node, 0)
+
+            #we want to randomly pick a subtree to replace and a subtree to replace it
+            if op_count_1+1 <= 2 or op_count_2+1 <= 2:
+                continue
+            node_1 = random.randrange(2, op_count_1+1)
+            node_2 = random.randrange(2, op_count_2+1)
+
+            #randomly decide whether to pick from tree1 or tree2
+            donator_choice = random.randrange(0, 2)
+            #if donator_choice == 0:
+            #pick from tree 1 and place onto tree 2, store in descendants
+            donated_node = get_node_at_operator_location(tree1.node, node_1)
+            new_donated_node = copy_tree(donated_node)
+            print("Adding subtree " + parseTree(donated_node) + " at location " + str(node_2))
+            #we are going to want to copy this tree before we stick stuff into it, in case we want to save the parent
+            new_root = copy_tree(tree2.node)
+            print("Equation before: " + str(parseTree(new_root)))
+            replace_node_at_operator_location(new_root, node_2, 0, new_donated_node)
+            print("Equation after: " + str(parseTree(new_root)))
+            print()
+            #elif donator_choice == 1:
+            #    #pick from tree 2 and place onto tree 1, store in descendants
+            #    donated_node = get_node_at_operator_location(tree2.node, node_2)
+            #    new_donated_node = copy_tree(donated_node)
+            #    print("Adding subtree " + parseTree(donated_node) + " at location " + str(node_2))
+            #    #we are going to want to copy this tree before we stick stuff into it, in case we want to save the parent
+            #    new_root = copy_tree(tree2.node)
+            #    print("Equation before: " + str(parseTree(new_root)))
+            #    replace_node_at_operator_location(new_root, node_1, 0, new_donated_node)
+            #    print("Equation after: " + str(parseTree(new_root)))
+            #    print()
+            #we have finished one iteration of the combination, add to descendents list now
+            eq = parseTree(new_root)
+            descendants.append(TreeData(new_root, eq, calc_rms_error(eq, file_data)))
+
+    tree_roots.extend(descendants)
+    eliminate_bottom_population(len(descendants))
+
+
+def eliminate_bottom_population(num_elim):
+    tree_roots.sort(key=lambda node: node.error)
+    for x in range(0,num_elim):
+        l = len(tree_roots)
+        tree_roots.pop(l-1)
 
 
 
@@ -326,7 +384,7 @@ if __name__ == "__main__":
             print("Starting generation " + str(i))
             print_equations(tree_roots)
             produce_next_generation()
-            print_equations(tree_roots)
+            #print_equations(tree_roots)
 
     #print_equations(produce_next_generation())
 

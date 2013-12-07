@@ -8,7 +8,7 @@ import copy
 NUM_TREES = 200
 MAX_DEPTH = 4
 NUM_MUTATIONS_PER_GEN = 40
-TOP_PERCENT = 0.2
+TOP_PERCENT = 0.5
 BOTTOM_PERCENT = 0.8
 TOP_PERCENT_PROPORTION = .8
 BOTTOM_PERCENT_PROPORTION = .2
@@ -50,7 +50,7 @@ def parseTree(current_node):
         eq += '('
         eq += parseTree(current_node.left)
     eq += str(current_node.data)
-    print(current_node.depth)
+    # print(current_node.depth)
     if current_node.data == '100*sin' and current_node.left is not None:
         eq += '('
         eq += parseTree(current_node.left)
@@ -100,16 +100,18 @@ def assign_node_values(current_node, current_depth, need_x, max_depth):
             if left is not None:
                 left = random.choice(possible_values)
                 if left == 'num':
-                    left = random.randrange(0, 100)
+                    left = random.randrange(-510, 510)
                 elif left == 'x':
                     need_x = False
                 current_node.left = EquationNode(left)
                 current_node.depth = current_depth+1
                 assign_node_values(current_node.left,current_depth+1,need_x,max_depth)
             if right is not None:
+                if current_node.data == '^':
+                    possible_values = ['num']
                 right = random.choice(possible_values)
                 if right == 'num':
-                    right = random.randrange(0,100)
+                    right = random.randrange(-510, 510)
                 elif left == 'x':
                     need_x = False
                 current_node.right = EquationNode(right)
@@ -427,7 +429,7 @@ def produce_next_generation():
     #        descendants.append(TreeData(new_root, eq, err))
 
     tree_roots.extend(descendants)
-    eliminate_bottom_population(int(len(tree_roots)/5))
+    eliminate_bottom_population(int(len(descendants)))
 
 
 def is_number(s):
@@ -439,14 +441,16 @@ def is_number(s):
 
 
 def perform_mutations():
+    allowed_operators = ['+', '-', '*', '/']
     for x in range(0, NUM_MUTATIONS_PER_GEN):
         tree_index = random.randrange(0, len(tree_roots))
         #let's pick several trees and randomly change an operator
         op_count = count_operator_nodes(tree_roots[tree_index].node, 0)
         #we want to randomly pick a subtree to replace and a subtree to replace it
         node = random.randrange(1, op_count+1)
-        new_op = random.choice(operators)
+        new_op = random.choice(allowed_operators)
         set_operator_at_depth(tree_roots[tree_index].node, new_op, node, 0)
+        tree_roots[tree_index].equation = parseTree(tree_roots[tree_index].node)
         tree_roots[tree_index].error = calc_rms_error(tree_roots[tree_index].equation, file_data)
 
 
